@@ -12,7 +12,7 @@ export default function Home() {
     formData.append("file", file);
 
     const res = await fetch(
-    "https://floorplan-wallpaper-app-frontend.onrender.com/analyze_floorplan", 
+    "https://floorplan-wallpaper-app-backend.onrender.com/analyze_floorplan", 
       {
         method: "POST",
         body: formData,
