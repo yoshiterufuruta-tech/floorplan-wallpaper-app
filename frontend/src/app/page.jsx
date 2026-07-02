@@ -61,7 +61,7 @@ export default function Home() {
 
   return (
     <div>
-      <h2>図面アップロード（壁線＋開口部＋寸法の完全可視化）</h2>
+      <h2>図面アップロード（壁線＋開口部＋寸法の可視化）</h2>
       <input type="file" onChange={handleUpload} />
       <canvas ref={canvasRef} style={{ border: "1px solid #ccc", marginTop: 20 }} />
       <pre>{result && JSON.stringify(result.result, null, 2)}</pre>
