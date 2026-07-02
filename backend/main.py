@@ -1,4 +1,5 @@
 from fastapi import FastAPI, File, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 import cv2
 import numpy as np
 from ultralytics import YOLO
@@ -7,7 +8,16 @@ import math
 
 app = FastAPI()
 
-# モデル読み込み（Renderでは /models に置く想定）
+# CORS（Renderフロントからのアクセスを許可）
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# モデル読み込み
 yolo_model = YOLO("models/openings_model.pt")
 ocr_model = PaddleOCR(lang="japan", use_angle_cls=True)
 
@@ -15,31 +25,20 @@ ocr_model = PaddleOCR(lang="japan", use_angle_cls=True)
 def extract_wall_lines(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
-
     thresh = cv2.adaptiveThreshold(
         blur, 255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
         cv2.THRESH_BINARY_INV,
         11, 2
     )
-
     edges = cv2.Canny(thresh, 50, 150)
-
-    lines = cv2.HoughLinesP(
-        edges,
-        rho=1,
-        theta=np.pi/180,
-        threshold=80,
-        minLineLength=40,
-        maxLineGap=5
-    )
+    lines = cv2.HoughLinesP(edges, 1, np.pi/180, 80, minLineLength=40, maxLineGap=5)
 
     wall_lines = []
     if lines is not None:
         for line in lines:
             x1, y1, x2, y2 = line[0]
             wall_lines.append([x1, y1, x2, y2])
-
     return wall_lines
 
 
@@ -53,7 +52,6 @@ def calc_wall_length_mm(wall_lines, scale_mm_per_pixel):
 
 def link_openings_with_dimensions(openings, dimensions, max_distance_px=250):
     linked = []
-
     for op in openings:
         ox = (op["x1"] + op["x2"]) / 2
         oy = (op["y1"] + op["y2"]) / 2
@@ -66,7 +64,6 @@ def link_openings_with_dimensions(openings, dimensions, max_distance_px=250):
         for dim in dimensions:
             tx, ty = dim["x"], dim["y"]
             dist = math.dist((ox, oy), (tx, ty))
-
             if dist > max_distance_px:
                 continue
 
@@ -85,33 +82,24 @@ def link_openings_with_dimensions(openings, dimensions, max_distance_px=250):
         width_mm = best_width["value_mm"] if best_width else None
         height_mm = best_height["value_mm"] if best_height else None
 
-        if op["label"] == "balcony_window":
-            if height_mm is None:
-                height_mm = 2000
-
-        if op["label"] == "door":
-            if height_mm is None:
-                height_mm = 2000
+        if op["label"] in ["balcony_window", "door"] and height_mm is None:
+            height_mm = 2000
 
         linked.append({
             "opening": op,
             "width_mm": width_mm,
             "height_mm": height_mm
         })
-
     return linked
 
 
 def calculate_wallpaper_area(linked_openings, wall_length_mm, ceiling_height_mm):
     wall_area_mm2 = wall_length_mm * ceiling_height_mm
-    opening_area_mm2 = 0
-
-    for item in linked_openings:
-        w = item["width_mm"]
-        h = item["height_mm"]
-        if w and h:
-            opening_area_mm2 += w * h
-
+    opening_area_mm2 = sum(
+        (item["width_mm"] * item["height_mm"])
+        for item in linked_openings
+        if item["width_mm"] and item["height_mm"]
+    )
     wallpaper_area_mm2 = wall_area_mm2 - opening_area_mm2
 
     return {
@@ -141,13 +129,7 @@ async def analyze_floorplan(
             x1, y1, x2, y2 = box.xyxy[0].tolist()
             cls = int(box.cls[0])
             label = yolo_model.names[cls]
-            openings.append({
-                "x1": x1,
-                "y1": y1,
-                "x2": x2,
-                "y2": y2,
-                "label": label
-            })
+            openings.append({"x1": x1, "y1": y1, "x2": x2, "y2": y2, "label": label})
 
     ocr_results = ocr_model.ocr(img, cls=True)
     dimensions = []
