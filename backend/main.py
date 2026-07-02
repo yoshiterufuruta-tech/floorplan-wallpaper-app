@@ -8,7 +8,7 @@ import math
 
 app = FastAPI()
 
-# CORS（Renderフロントからのアクセスを許可）
+# CORS設定
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
