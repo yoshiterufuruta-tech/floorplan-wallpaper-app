@@ -12,7 +12,7 @@ export default function Home() {
     formData.append("file", file);
 
     const res = await fetch(
-        "https://floorplan-backend.onrender.com/analyze_floorplan",
+    "https://floorplan-backend.onrender.com/analyze_floorplan", 
       {
         method: "POST",
         body: formData,
@@ -36,7 +36,6 @@ export default function Home() {
 
     ctx.drawImage(img, 0, 0);
 
-    // 壁線（赤）
     ctx.strokeStyle = "red";
     ctx.lineWidth = 2;
     data.wall_lines.forEach(([x1, y1, x2, y2]) => {
@@ -46,7 +45,6 @@ export default function Home() {
       ctx.stroke();
     });
 
-    // 開口部（青）
     ctx.strokeStyle = "blue";
     ctx.lineWidth = 3;
     data.openings.forEach((op) => {
@@ -54,7 +52,6 @@ export default function Home() {
       ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
     });
 
-    // 寸法（緑）
     ctx.fillStyle = "green";
     ctx.font = "20px Arial";
     data.dimensions.forEach((dim) => {
